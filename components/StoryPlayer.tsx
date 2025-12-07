@@ -1,7 +1,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { GeneratedSceneMedia, StoryData, SubtitleLang } from '../types';
-import { Play, Pause, X, Copy, Download, Youtube, Check, CloudRain, Zap, Snowflake, Flame, Music, Volume2, VolumeX, Sliders, Upload, HardDrive, AlertCircle, Folder, ChevronRight, Loader2, Subtitles } from 'lucide-react';
+import { Play, Pause, X, Copy, Download, Youtube, Check, CloudRain, Zap, Snowflake, Flame, Music, Volume2, VolumeX, Sliders, Upload, HardDrive, AlertCircle, Folder, ChevronRight, Loader2, Subtitles, Video as VideoIcon, Camera } from 'lucide-react';
 
 interface StoryPlayerProps {
   media: GeneratedSceneMedia[];
@@ -23,11 +23,14 @@ const BGM_LIBRARY: Record<string, string> = {
 // Royalty-Free Sound Effects (Pixabay)
 const SFX_LIBRARY: Record<string, string> = {
   "rain": "https://cdn.pixabay.com/download/audio/2021/09/06/audio_360a4f5b92.mp3?filename=rain-and-thunder-16705.mp3", // Rain + Thunder
+  "heavy_rain": "https://cdn.pixabay.com/download/audio/2022/02/07/audio_06d86b7263.mp3?filename=heavy-rain-storm-10651.mp3", // Heavy Rain
   "thunder": "https://cdn.pixabay.com/download/audio/2022/03/10/audio_c3c332e983.mp3?filename=thunder-25667.mp3", // Heavy Thunder
   "forest": "https://cdn.pixabay.com/download/audio/2021/09/06/audio_27d2c38865.mp3?filename=forest-birds-16447.mp3", // Forest Ambiance
   "city": "https://cdn.pixabay.com/download/audio/2021/08/04/audio_6506f5909e.mp3?filename=city-traffic-outdoor-6421.mp3", // City Traffic
   "fire": "https://cdn.pixabay.com/download/audio/2022/01/18/audio_83907c030d.mp3?filename=fireplace-2007.mp3", // Fire Crackle
-  "magic": "https://cdn.pixabay.com/download/audio/2022/03/15/audio_7306231d68.mp3?filename=magic-wand-6223.mp3" // Sparkle
+  "magic": "https://cdn.pixabay.com/download/audio/2022/03/15/audio_7306231d68.mp3?filename=magic-wand-6223.mp3", // Sparkle
+  "footsteps": "https://cdn.pixabay.com/download/audio/2022/03/24/audio_1c96417539.mp3?filename=footsteps-on-gravel-14631.mp3", // Footsteps
+  "wind": "https://cdn.pixabay.com/download/audio/2022/01/18/audio_4da589b274.mp3?filename=wind-blowing-sfx-12798.mp3" // Wind
 };
 
 const DEFAULT_BGM = BGM_LIBRARY["Calm (Piano)"];
@@ -99,7 +102,7 @@ const StoryPlayer: React.FC<StoryPlayerProps> = ({ media, storyData, onClose, cu
   const [subtitleLang, setSubtitleLang] = useState<SubtitleLang>(storyData.config?.defaultSubtitleLang ?? 'th');
   const [showMusicMenu, setShowMusicMenu] = useState(false);
   const [bgmVolume, setBgmVolume] = useState(0.15);
-  const [sfxVolume, setSfxVolume] = useState(0.3);
+  const [sfxVolume, setSfxVolume] = useState(0.4);
   const [currentBgmName, setCurrentBgmName] = useState<string>("Calm (Piano)");
   const [customBgmUrl, setCustomBgmUrl] = useState<string | null>(null);
 
@@ -126,12 +129,15 @@ const StoryPlayer: React.FC<StoryPlayerProps> = ({ media, storyData, onClose, cu
   const startTimeRef = useRef<number>(0);
   const pausedTimeRef = useRef<number>(0); 
   const animationFrameRef = useRef<number>(0);
+  
+  // VFX Refs
   const lightningOpacityRef = useRef<number>(0);
+  const shakeOffsetRef = useRef({ x: 0, y: 0 });
 
   // Transition Refs (For smooth crossfade)
   const previousSceneBitmapRef = useRef<ImageBitmap | null>(null);
   const transitionStartTimeRef = useRef<number>(0);
-  const TRANSITION_DURATION = 800; // ms
+  const TRANSITION_DURATION = 1000; // 1 second smooth dissolve
 
   // Assets Refs
   const logoImgRef = useRef<HTMLImageElement | null>(null);
@@ -156,7 +162,7 @@ const StoryPlayer: React.FC<StoryPlayerProps> = ({ media, storyData, onClose, cu
     let count = 0;
     let type: Particle['type'] = 'dust';
 
-    if (effect === 'rain' || effect === 'storm') { count = 150; type = 'rain'; } 
+    if (effect === 'rain' || effect === 'storm' || effect === 'heavy_rain') { count = 150; type = 'rain'; } 
     else if (effect === 'snow') { count = 100; type = 'snow'; } 
     else if (effect === 'fire') { count = 60; type = 'ember'; } 
     else { count = 40; type = 'dust'; }
@@ -277,8 +283,7 @@ const StoryPlayer: React.FC<StoryPlayerProps> = ({ media, storyData, onClose, cu
       }
   };
 
-  // --- Google Drive Integration ---
-  
+  // --- Google Drive Integration --- (Kept as is)
   useEffect(() => {
     if (typeof google !== 'undefined' && google.accounts && process.env.GOOGLE_CLIENT_ID) {
          try {
@@ -386,7 +391,6 @@ const StoryPlayer: React.FC<StoryPlayerProps> = ({ media, storyData, onClose, cu
           setUploadStatus('error'); 
       }
   };
-
   // --- End Drive Integration ---
 
   useEffect(() => {
@@ -397,7 +401,7 @@ const StoryPlayer: React.FC<StoryPlayerProps> = ({ media, storyData, onClose, cu
     }
   }, [customLogoUrl]);
 
-  // Handle Video Element Loop
+  // Handle Video Element Playback
   useEffect(() => {
     if (videoRef.current) {
         if (isPlaying) {
@@ -425,7 +429,7 @@ const StoryPlayer: React.FC<StoryPlayerProps> = ({ media, storyData, onClose, cu
     
     // Re-init particles if needed
     const currentType = particlesRef.current[0]?.type;
-    const targetType = (visualEffect === 'rain' || visualEffect === 'storm') ? 'rain' : 
+    const targetType = (visualEffect === 'rain' || visualEffect === 'storm' || visualEffect === 'heavy_rain') ? 'rain' : 
                        (visualEffect === 'snow') ? 'snow' : 
                        (visualEffect === 'fire') ? 'ember' : 'dust';
                        
@@ -445,23 +449,37 @@ const StoryPlayer: React.FC<StoryPlayerProps> = ({ media, storyData, onClose, cu
         
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        // --- LAYER 1: Background (Smooth Transition) ---
-        // Calculate transition opacity
+        // --- LAYER 1: Background & Transitions ---
+        
+        // 1. Calculate transition opacity (Crossfade)
         const timeSinceTransition = timestamp - transitionStartTimeRef.current;
         const transitionProgress = Math.min(timeSinceTransition / TRANSITION_DURATION, 1.0);
         
-        // 1. Draw Previous Scene (If transitioning)
+        ctx.save();
+        
+        // VFX: Camera Shake (If walking/running)
+        if (visualEffect === 'camera_shake') {
+            const shakeAmt = 5;
+            shakeOffsetRef.current = {
+                x: (Math.random() - 0.5) * shakeAmt,
+                y: (Math.random() - 0.5) * shakeAmt
+            };
+            ctx.translate(shakeOffsetRef.current.x, shakeOffsetRef.current.y);
+        } else {
+            shakeOffsetRef.current = {x:0, y:0};
+        }
+
+        // 2. Draw Previous Scene (If transitioning)
         if (previousSceneBitmapRef.current && transitionProgress < 1.0) {
              ctx.globalAlpha = 1.0;
              ctx.drawImage(previousSceneBitmapRef.current, 0, 0, canvas.width, canvas.height);
         }
 
-        // 2. Draw Current Scene (Fade In)
-        ctx.globalAlpha = transitionProgress; // Fade in current scene
+        // 3. Draw Current Scene (Fade In over previous)
+        ctx.globalAlpha = transitionProgress; 
 
         if (isVideoMode && videoRef.current) {
              // Draw video frame to canvas
-             // We check readyState to avoid drawing black frames if video isn't ready
              if (videoRef.current.readyState >= 2) {
                  ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
              }
@@ -478,10 +496,12 @@ const StoryPlayer: React.FC<StoryPlayerProps> = ({ media, storyData, onClose, cu
             ctx.drawImage(img, x, y, w, h);
         }
         
-        ctx.globalAlpha = 1.0; // Reset alpha for overlays
+        ctx.restore(); // Restore context (remove shake translation)
+        ctx.globalAlpha = 1.0; 
 
         // --- LAYER 2: VFX ---
-        if (visualEffect === 'storm') {
+        // Lightning Flash
+        if (visualEffect === 'lightning' || visualEffect === 'storm') {
             if (Math.random() > 0.98) lightningOpacityRef.current = 0.8;
             if (lightningOpacityRef.current > 0) {
                 ctx.fillStyle = `rgba(255, 255, 255, ${lightningOpacityRef.current})`;
@@ -490,6 +510,7 @@ const StoryPlayer: React.FC<StoryPlayerProps> = ({ media, storyData, onClose, cu
             }
         }
 
+        // Particles
         particlesRef.current.forEach(p => {
             ctx.globalAlpha = p.alpha;
             ctx.beginPath();
@@ -623,7 +644,7 @@ const StoryPlayer: React.FC<StoryPlayerProps> = ({ media, storyData, onClose, cu
     cancelAnimationFrame(animationFrameRef.current);
     setProgress(100);
     
-    // Capture snapshot of current frame for transition
+    // Capture snapshot of current frame for transition crossfade
     if (canvasRef.current) {
        try {
            const bitmap = await createImageBitmap(canvasRef.current);
@@ -635,8 +656,7 @@ const StoryPlayer: React.FC<StoryPlayerProps> = ({ media, storyData, onClose, cu
     }
 
     if (currentSceneIndex < media.length - 1) {
-      // Small delay to allow snapshot and logic to settle
-      // We don't want a long delay, just enough for the loop to pick up the transition state
+      // Small delay to allow snapshot to register before state update
       setTimeout(() => { 
           setCurrentSceneIndex(prev => prev + 1); 
           pausedTimeRef.current = 0; 
@@ -717,24 +737,43 @@ const StoryPlayer: React.FC<StoryPlayerProps> = ({ media, storyData, onClose, cu
       <canvas ref={canvasRef} className="fixed top-0 left-0 pointer-events-none opacity-0" style={{ zIndex: -1 }} />
       <div className="relative w-full h-full max-w-[450px] max-h-[800px] aspect-[9/16] bg-gray-900 overflow-hidden shadow-2xl flex flex-col group">
         
-        {/* Render Video or Image */}
-        <div className="absolute inset-0 overflow-hidden bg-black">
-             {currentMedia.videoUrl ? (
-                 <video 
-                    ref={videoRef}
-                    key={`vid-${currentSceneIndex}`}
-                    src={currentMedia.videoUrl}
-                    className="w-full h-full object-cover"
-                    loop
-                    playsInline
-                    muted
-                 />
-             ) : (
-                 <img key={currentMedia.imageUrl} src={currentMedia.imageUrl} alt="Story Scene" className={`w-full h-full object-cover transition-transform duration-[10000ms] ease-linear transform scale-100 ${isPlaying ? 'scale-110' : ''}`} />
-             )}
-             
-             <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-90 pointer-events-none"></div>
-             <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-b from-black/60 to-transparent pointer-events-none"></div>
+        {/* Render Hidden Video for processing */}
+        {media.map((m, i) => m.videoUrl && (
+             <video 
+                key={`preload-vid-${i}`}
+                ref={i === currentSceneIndex ? videoRef : null}
+                src={m.videoUrl}
+                className="hidden"
+                crossOrigin="anonymous"
+                loop
+                playsInline
+                muted
+             />
+        ))}
+
+        {/* Viewport that mirrors canvas */}
+        <div className="absolute inset-0 overflow-hidden bg-black flex items-center justify-center">
+             {/* We use a second canvas for display if performance permits, but for React simplicity, we might just rely on the main hidden canvas being visible? 
+                 Actually, in previous code we rendered Image/Video DOM elements here. 
+                 To support particle effects OVER video, we should just show the canvas itself. 
+             */}
+             <canvas 
+                ref={(node) => {
+                    // Sync this display canvas with the main recording canvas
+                    if (node && canvasRef.current) {
+                        const ctx = node.getContext('2d');
+                        const main = canvasRef.current;
+                        const loop = () => {
+                            if (!node || !main) return;
+                            node.width = main.width; node.height = main.height;
+                            ctx?.drawImage(main, 0, 0);
+                            requestAnimationFrame(loop);
+                        };
+                        loop();
+                    }
+                }}
+                className="w-full h-full object-contain"
+             />
         </div>
 
         {/* UI Controls Overlay (Top) */}
@@ -748,10 +787,18 @@ const StoryPlayer: React.FC<StoryPlayerProps> = ({ media, storyData, onClose, cu
                     <div className="bg-black/30 backdrop-blur-md px-3 py-1 rounded-full border border-white/10 flex items-center gap-2 self-start">
                         {currentMedia.visualEffect === 'rain' && <CloudRain size={12} className="text-blue-300"/>}
                         {currentMedia.visualEffect === 'storm' && <Zap size={12} className="text-yellow-300"/>}
+                        {currentMedia.visualEffect === 'lightning' && <Zap size={12} className="text-yellow-100"/>}
                         {currentMedia.visualEffect === 'snow' && <Snowflake size={12} className="text-white"/>}
                         {currentMedia.visualEffect === 'fire' && <Flame size={12} className="text-orange-400"/>}
-                        <span className="text-white text-xs font-medium capitalize">{currentMedia.visualEffect}</span>
+                        {currentMedia.visualEffect === 'camera_shake' && <Camera size={12} className="text-red-400"/>}
+                        <span className="text-white text-xs font-medium capitalize">{currentMedia.visualEffect.replace('_', ' ')}</span>
                     </div>
+                 )}
+                 {currentMedia.videoUrl && (
+                     <div className="bg-indigo-600/30 backdrop-blur-md px-3 py-1 rounded-full border border-indigo-500/30 flex items-center gap-2 self-start">
+                         <VideoIcon size={12} className="text-indigo-300"/>
+                         <span className="text-indigo-100 text-xs font-medium">Veo Video</span>
+                     </div>
                  )}
              </div>
 
@@ -794,11 +841,6 @@ const StoryPlayer: React.FC<StoryPlayerProps> = ({ media, storyData, onClose, cu
                                         {currentBgmName === name && !customBgmUrl && <div className="w-1.5 h-1.5 bg-white rounded-full"></div>}
                                     </button>
                                 ))}
-                            </div>
-                            <div className="pt-2 border-t border-slate-700">
-                                <label className="flex items-center justify-center gap-2 w-full py-2 bg-slate-700 hover:bg-slate-600 rounded-lg cursor-pointer text-xs text-slate-300 transition">
-                                    <Upload size={12} /><span>Upload MP3</span><input type="file" accept="audio/*" onChange={handleCustomBgmUpload} className="hidden" />
-                                </label>
                             </div>
                         </div>
                      )}
@@ -849,7 +891,7 @@ const StoryPlayer: React.FC<StoryPlayerProps> = ({ media, storyData, onClose, cu
         </div>
       </div>
 
-      {/* Export Modal */}
+      {/* Export Modal (Same as before) */}
       {showExportModal && (
         <div className="absolute inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-end sm:items-center justify-center p-4 animate-fade-in">
             <div className="bg-[#1e293b] w-full max-w-sm rounded-t-2xl sm:rounded-2xl border border-slate-700 shadow-2xl overflow-hidden relative">

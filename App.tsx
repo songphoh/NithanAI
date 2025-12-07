@@ -51,6 +51,9 @@ function App() {
       const storedKey = localStorage.getItem("gemini_api_key");
       if (storedKey) {
           setIsApiKeyReady(true);
+      } else if (process.env.API_KEY && process.env.API_KEY !== 'undefined') {
+          // If injected via ENV at build time (rare for this client-side template but possible)
+          setIsApiKeyReady(true);
       }
     };
     checkAuth();
@@ -120,20 +123,21 @@ function App() {
       setAppState(AppState.GENERATING_MEDIA);
       setProgress(15);
 
-      // 2. Generate Cover Image (Parallel or Step)
+      // 2. Generate Cover Image (Priority for Dashboard)
       if (storyData.coverImagePrompt) {
          setStatusMessage(`กำลังสร้างภาพหน้าปก: "${storyData.coverTitle || storyData.title}"...`);
          try {
+             // Covers are always images, even in video mode
              const coverUrl = await generateSceneImage(storyData.coverImagePrompt);
              storyData.coverImageUrl = coverUrl;
              setStoryMeta(prev => ({ ...prev, coverImageUrl: coverUrl }));
          } catch (e) {
              console.warn("Cover image generation failed", e);
-             // Continue without cover, will fallback to first scene later
+             // Continue without cover
          }
       }
 
-      setStatusMessage(`ได้โครงเรื่องแล้ว: "${storyData.title}" กำลังวาดภาพและอัดเสียง...`);
+      setStatusMessage(`ได้โครงเรื่องแล้ว: "${storyData.title}" กำลังสร้างสื่อและอัดเสียง...`);
       setProgress(20);
 
       const mediaItems: GeneratedSceneMedia[] = [];
@@ -150,7 +154,7 @@ function App() {
         
         let visualPromise;
         if (mediaType === 'video') {
-            setStatusMessage(`กำลังสร้างวิดีโอ (Veo) ฉากที่ ${i + 1}/${totalSteps}: "${scene.storyText.substring(0, 20)}..."\n(อาจใช้เวลา 1-2 นาที)`);
+            setStatusMessage(`กำลังสร้างวิดีโอ (Veo) ฉากที่ ${i + 1}/${totalSteps}: "${scene.storyText.substring(0, 20)}..."\n(อาจใช้เวลา 1-2 นาทีต่อฉาก)`);
             visualPromise = generateSceneVideo(scene.imagePrompt);
         } else {
             setStatusMessage(`กำลังวาดภาพฉากที่ ${i + 1}/${totalSteps}: "${scene.storyText.substring(0, 20)}..."`);
@@ -192,7 +196,7 @@ function App() {
         setAppState(AppState.ERROR);
         
         if (error.message?.includes('403') || error.message?.includes('permission') || error.toString().includes('403')) {
-             setStatusMessage('เกิดข้อผิดพลาด: สิทธิ์การใช้งานไม่ถูกต้อง (Permission Denied). กรุณาตรวจสอบว่า API Key ของคุณเปิดใช้งาน Billing แล้ว (จำเป็นสำหรับโมเดล Veo และ Pro)');
+             setStatusMessage('เกิดข้อผิดพลาด: สิทธิ์การใช้งานไม่ถูกต้อง (Permission Denied). กรุณาตรวจสอบว่า API Key ของคุณเปิดใช้งาน Billing แล้ว (จำเป็นสำหรับโมเดล Veo และ Gemini 3 Pro)');
         } else {
              setStatusMessage(`เกิดข้อผิดพลาด: ${error.message || 'โปรดลองใหม่อีกครั้ง'}`);
         }

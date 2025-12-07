@@ -4,8 +4,9 @@ export interface StoryScene {
   englishTranslation?: string; // English translation for subtitles
   imagePrompt: string; // The prompt for the image generator
   sceneNumber: number;
-  visualEffect?: 'none' | 'rain' | 'storm' | 'snow' | 'fire' | 'fog' | 'sparkles';
-  soundEffect?: 'none' | 'rain' | 'thunder' | 'forest' | 'city' | 'fire' | 'magic';
+  // Extended VFX/SFX types
+  visualEffect?: 'none' | 'rain' | 'storm' | 'snow' | 'fire' | 'fog' | 'sparkles' | 'camera_shake' | 'lightning';
+  soundEffect?: 'none' | 'rain' | 'thunder' | 'forest' | 'city' | 'fire' | 'magic' | 'footsteps' | 'wind' | 'heavy_rain';
 }
 
 export type StoryMode = 'short' | 'medium' | 'long' | 'mega_long';

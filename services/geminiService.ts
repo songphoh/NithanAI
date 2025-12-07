@@ -8,12 +8,12 @@ const getClient = () => {
   let apiKey = process.env.API_KEY;
   
   // 2. Try Local Storage (For Vercel/Public deployments)
-  if (!apiKey) {
+  if (!apiKey || apiKey === 'undefined') {
     apiKey = localStorage.getItem("gemini_api_key") || undefined;
   }
 
   if (!apiKey) {
-    throw new Error("API Key is missing. Please set it in the settings.");
+    throw new Error("API Key is missing. Please enter it in the settings screen.");
   }
   return new GoogleGenAI({ apiKey });
 };
@@ -54,20 +54,22 @@ export const generateStoryScript = async (topic: string, mode: StoryMode = 'shor
     1. **Duration:** ${durationPrompt}
     2. **Structure:** The story MUST be complete with a clear beginning, middle, and a satisfying ending/conclusion within exactly ${sceneCount} scenes. 
     3. **Visual Style:** Define a "Photorealistic, Cinematic, 8K resolution, Pixar-style 3D render but realistic lighting" style. 
-    4. **Character:** Define a main character with consistent features (e.g., "A cute little girl with a red hoodie and big brown eyes").
+    4. **Character Consistency:** Define a main character with consistent features (e.g., "A cute little girl with a red hoodie and big brown eyes"). **YOU MUST INCLUDE THIS EXACT DESCRIPTION IN EVERY SINGLE 'imagePrompt'**.
     5. **Audio/Mood:** Analyze the story's overall sentiment. Is it Happy, Sad, Exciting, Scary, or Calm?
     6. **Language:** The 'storyText' MUST be in Thai. You MUST also provide an 'englishTranslation' for subtitles.
-    7. **FX Analysis:** For each scene, choose a 'visualEffect' (rain, storm, snow, fire, fog, sparkles, none) and a 'soundEffect' (rain, thunder, forest, city, fire, magic, none) that matches the context.
+    7. **FX Analysis:** 
+       - 'visualEffect': Choose from [none, rain, storm, snow, fire, fog, sparkles, camera_shake, lightning]. 'camera_shake' for running/chasing scenes.
+       - 'soundEffect': Choose from [none, rain, thunder, forest, city, fire, magic, footsteps, wind, heavy_rain].
     8. **SEO & Cover:**
        - Generate a standard "Title" in Thai.
-       - Generate a **"Cover Title"**: A very short, punchy, clickbait phrase (3-5 words max) in Thai to place on the thumbnail (e.g., "จุดจบสายแข็ง", "ผีบังตา", "รักต้องห้าม").
-       - Generate a **"Cover Image Prompt"**: A highly detailed, dramatic image prompt for the video cover/thumbnail. High contrast, expressive.
+       - Generate a **"Cover Title"**: A very short, punchy, CLICKBAIT phrase (2-5 words) in Thai for the thumbnail (e.g., "จุดจบสายแข็ง", "ผีบังตา", "อย่ามองกลับหลัง").
+       - Generate a **"Cover Image Prompt"**: A highly detailed, dramatic image prompt for the video cover/thumbnail. High contrast, expressive, YouTube Thumbnail style collage.
        - Generate a compelling Description and 10 trending Hashtags.
     9. **Scenes:**
        - Create exactly ${sceneCount} scenes.
        - 'storyText': Thai narration (keep it concise, ~8-10 seconds reading time per scene).
        - 'englishTranslation': Accurate English translation of the storyText.
-       - 'imagePrompt': Detailed English prompt. START with: "Photorealistic, 8k, cinematic lighting...". Include the character description in every single prompt to ensure consistency.
+       - 'imagePrompt': Detailed English prompt. START with: "Photorealistic, 8k, cinematic lighting...". **INCLUDE THE CHARACTER DESCRIPTION**.
     
     Output JSON format.
   `;
@@ -100,10 +102,10 @@ export const generateLongStoryScript = async (topic: string, mode: 'long' | 'meg
     1. **Format:** This is a Long Form story. ${lengthInstruction} Focus on deep narration, beautiful language, and immersive storytelling.
     2. **Structure:** Divide the story into exactly ${chapterCount} Chapters (Scenes).
     3. **Length:** ${wordCountInstruction}
-    4. **Cover:** Generate a "Cover Title" (Short clickbait in Thai) and "Cover Image Prompt".
+    4. **Cover:** Generate a "Cover Title" (Short clickbait in Thai) and "Cover Image Prompt" (YouTube Thumbnail style).
     5. **Character:** Define a main character with consistent features.
     6. **Language:** The 'storyText' MUST be in Thai. You MUST also provide an 'englishTranslation' for subtitles.
-    7. **FX Analysis:** Choose 'visualEffect' and 'soundEffect'.
+    7. **FX Analysis:** Choose 'visualEffect' and 'soundEffect' (including new types like camera_shake, lightning, footsteps).
     8. **Mood:** Analyze the sentiment.
     9. **SEO:** Title, Description, Hashtags.
     
@@ -139,8 +141,8 @@ const fetchStoryFromGemini = async (ai: GoogleGenAI, prompt: string, mode: Story
                 storyText: { type: Type.STRING },
                 englishTranslation: { type: Type.STRING },
                 imagePrompt: { type: Type.STRING },
-                visualEffect: { type: Type.STRING, enum: ['none', 'rain', 'storm', 'snow', 'fire', 'fog', 'sparkles'] },
-                soundEffect: { type: Type.STRING, enum: ['none', 'rain', 'thunder', 'forest', 'city', 'fire', 'magic'] },
+                visualEffect: { type: Type.STRING, enum: ['none', 'rain', 'storm', 'snow', 'fire', 'fog', 'sparkles', 'camera_shake', 'lightning'] },
+                soundEffect: { type: Type.STRING, enum: ['none', 'rain', 'thunder', 'forest', 'city', 'fire', 'magic', 'footsteps', 'wind', 'heavy_rain'] },
               },
             },
           },
@@ -188,7 +190,7 @@ export const generateSceneImage = async (imagePrompt: string): Promise<string> =
     }
   } catch (error: any) {
     console.error("Image Gen Error:", error);
-    if (error.message?.includes('403')) {
+    if (error.message?.includes('403') || error.toString().includes('403')) {
       throw new Error("Permission Denied: Please use a paid API Key (Billing Enabled) for Gemini 3 Pro Images.");
     }
     throw error;

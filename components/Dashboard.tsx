@@ -27,13 +27,75 @@ const Dashboard: React.FC<DashboardProps> = ({ history, onPlay, onCreateNew }) =
       const url = item.storyData.coverImageUrl || item.media[0].imageUrl;
       if (!url) return;
 
-      // Create temporary link
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `cover-${item.storyData.title.replace(/\s+/g, '-')}.png`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      // Use a canvas to draw the text onto the image
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.src = url;
+
+      img.onload = () => {
+          // Setup Canvas
+          canvas.width = 1080;
+          canvas.height = 1920;
+          
+          if (ctx) {
+             // Draw Image
+             ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+             
+             // Draw Overlay
+             const gradient = ctx.createLinearGradient(0, canvas.height * 0.4, 0, canvas.height);
+             gradient.addColorStop(0, "rgba(0,0,0,0)");
+             gradient.addColorStop(0.7, "rgba(0,0,0,0.6)");
+             gradient.addColorStop(1, "rgba(0,0,0,0.9)");
+             ctx.fillStyle = gradient;
+             ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+             // Draw Title
+             const title = item.storyData.coverTitle || item.storyData.title;
+             ctx.save();
+             ctx.translate(canvas.width / 2, canvas.height / 2.5);
+             ctx.rotate(-0.05); // Slight tilt
+             ctx.font = "900 120px 'Prompt', sans-serif";
+             ctx.textAlign = "center";
+             ctx.textBaseline = "middle";
+             
+             // Text Shadow/Stroke (Viral Style)
+             ctx.shadowColor = "rgba(0,0,0,0.8)";
+             ctx.shadowBlur = 20;
+             ctx.shadowOffsetX = 5;
+             ctx.shadowOffsetY = 5;
+             
+             ctx.lineWidth = 25;
+             ctx.strokeStyle = "black";
+             ctx.strokeText(title, 0, 0);
+             
+             ctx.fillStyle = "#FFD700"; // Gold color
+             const gradientText = ctx.createLinearGradient(0, -50, 0, 50);
+             gradientText.addColorStop(0, "#ffffff");
+             gradientText.addColorStop(0.5, "#FFD700");
+             gradientText.addColorStop(1, "#FF8C00");
+             ctx.fillStyle = gradientText;
+             
+             ctx.fillText(title, 0, 0);
+             ctx.restore();
+
+             // Draw NithanAI Tag
+             ctx.font = "bold 40px 'Prompt', sans-serif";
+             ctx.fillStyle = "rgba(255,255,255,0.8)";
+             ctx.textAlign = "center";
+             ctx.fillText("#NithanAI", canvas.width / 2, canvas.height - 100);
+
+             // Download
+             const dataUrl = canvas.toDataURL("image/png");
+             const a = document.createElement('a');
+             a.href = dataUrl;
+             a.download = `cover-${item.storyData.title.replace(/\s+/g, '-')}.png`;
+             document.body.appendChild(a);
+             a.click();
+             document.body.removeChild(a);
+          }
+      };
   };
 
   return (
@@ -139,7 +201,7 @@ const Dashboard: React.FC<DashboardProps> = ({ history, onPlay, onCreateNew }) =
                             {/* Download Cover Button (New) */}
                             <button 
                                 onClick={(e) => handleDownloadCover(e, item)}
-                                className="absolute top-2 right-2 p-2 bg-black/50 hover:bg-indigo-600 backdrop-blur-md rounded-full text-white transition opacity-0 group-hover:opacity-100 border border-white/20"
+                                className="absolute top-2 right-2 p-2 bg-black/50 hover:bg-indigo-600 backdrop-blur-md rounded-full text-white transition opacity-0 group-hover:opacity-100 border border-white/20 hover:scale-105"
                                 title="Download Cover"
                             >
                                 <Download size={14} />
@@ -167,6 +229,11 @@ const Dashboard: React.FC<DashboardProps> = ({ history, onPlay, onCreateNew }) =
                                     <span className="text-[10px] px-1.5 py-0.5 bg-slate-700 text-slate-300 rounded border border-slate-600">
                                         {item.storyData.mode}
                                     </span>
+                                    {item.storyData.config?.mediaType === 'video' && (
+                                         <span className="text-[10px] px-1.5 py-0.5 bg-indigo-900 text-indigo-300 rounded border border-indigo-700">
+                                            Video
+                                        </span>
+                                    )}
                                 </div>
                             </div>
                         </div>
