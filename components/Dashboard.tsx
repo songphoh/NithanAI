@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { HistoryItem, StoryData } from '../types';
-import { Play, FileText, Clock, TrendingUp, Sparkles, LayoutGrid, Calendar } from 'lucide-react';
+import { Play, FileText, Clock, TrendingUp, Sparkles, LayoutGrid, Calendar, Download } from 'lucide-react';
 
 interface DashboardProps {
   history: HistoryItem[];
@@ -21,6 +21,20 @@ const Dashboard: React.FC<DashboardProps> = ({ history, onPlay, onCreateNew }) =
   }, {} as Record<string, number>);
   
   const topMood = Object.entries(moodCounts).sort((a: [string, number], b: [string, number]) => b[1] - a[1])[0]?.[0] || '-';
+
+  const handleDownloadCover = (e: React.MouseEvent, item: HistoryItem) => {
+      e.stopPropagation(); // Prevent card click
+      const url = item.storyData.coverImageUrl || item.media[0].imageUrl;
+      if (!url) return;
+
+      // Create temporary link
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `cover-${item.storyData.title.replace(/\s+/g, '-')}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+  };
 
   return (
     <div className="w-full h-full overflow-y-auto p-6 md:p-10 animate-fade-in">
@@ -96,7 +110,7 @@ const Dashboard: React.FC<DashboardProps> = ({ history, onPlay, onCreateNew }) =
         ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {history.map((item) => (
-                    <div key={item.storyData.id} className="group bg-slate-900 border border-slate-800 hover:border-indigo-500/50 rounded-xl overflow-hidden transition-all hover:shadow-xl hover:shadow-indigo-500/10 flex flex-col">
+                    <div key={item.storyData.id} className="group bg-slate-900 border border-slate-800 hover:border-indigo-500/50 rounded-xl overflow-hidden transition-all hover:shadow-xl hover:shadow-indigo-500/10 flex flex-col cursor-pointer" onClick={() => onPlay(item)}>
                         {/* Thumbnail */}
                         <div className="relative aspect-[9/16] overflow-hidden">
                             <img 
@@ -116,15 +130,23 @@ const Dashboard: React.FC<DashboardProps> = ({ history, onPlay, onCreateNew }) =
 
                             <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3 bg-black/40 backdrop-blur-sm">
                                 <button 
-                                    onClick={() => onPlay(item)}
                                     className="p-4 bg-white text-indigo-600 rounded-full hover:scale-110 transition shadow-xl"
                                 >
                                     <Play size={28} fill="currentColor" />
                                 </button>
                             </div>
+
+                            {/* Download Cover Button (New) */}
+                            <button 
+                                onClick={(e) => handleDownloadCover(e, item)}
+                                className="absolute top-2 right-2 p-2 bg-black/50 hover:bg-indigo-600 backdrop-blur-md rounded-full text-white transition opacity-0 group-hover:opacity-100 border border-white/20"
+                                title="Download Cover"
+                            >
+                                <Download size={14} />
+                            </button>
                             
                             {/* Tags/Mood Badge */}
-                            <div className="absolute top-2 right-2 bg-indigo-600/90 backdrop-blur-md px-2 py-1 rounded text-xs text-white font-bold shadow-lg">
+                            <div className="absolute top-2 left-2 bg-indigo-600/90 backdrop-blur-md px-2 py-1 rounded text-xs text-white font-bold shadow-lg">
                                 {item.storyData.mood}
                             </div>
                         </div>

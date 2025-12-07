@@ -128,6 +128,11 @@ const StoryPlayer: React.FC<StoryPlayerProps> = ({ media, storyData, onClose, cu
   const animationFrameRef = useRef<number>(0);
   const lightningOpacityRef = useRef<number>(0);
 
+  // Transition Refs (For smooth crossfade)
+  const previousSceneBitmapRef = useRef<ImageBitmap | null>(null);
+  const transitionStartTimeRef = useRef<number>(0);
+  const TRANSITION_DURATION = 800; // ms
+
   // Assets Refs
   const logoImgRef = useRef<HTMLImageElement | null>(null);
   const particlesRef = useRef<Particle[]>([]);
@@ -431,9 +436,6 @@ const StoryPlayer: React.FC<StoryPlayerProps> = ({ media, storyData, onClose, cu
     const img = new Image();
     if (currentScene.imageUrl) img.src = currentScene.imageUrl;
     
-    // For video mode, we might need to draw the video element to canvas if recording
-    // But for playback, we just overlay the video element in DOM
-    
     let animId: number;
     let localStartTime = performance.now();
 
@@ -442,14 +444,25 @@ const StoryPlayer: React.FC<StoryPlayerProps> = ({ media, storyData, onClose, cu
         const elapsed = timestamp - localStartTime;
         
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // --- LAYER 1: Background (Smooth Transition) ---
+        // Calculate transition opacity
+        const timeSinceTransition = timestamp - transitionStartTimeRef.current;
+        const transitionProgress = Math.min(timeSinceTransition / TRANSITION_DURATION, 1.0);
         
-        // 1. Background (Image or Video)
+        // 1. Draw Previous Scene (If transitioning)
+        if (previousSceneBitmapRef.current && transitionProgress < 1.0) {
+             ctx.globalAlpha = 1.0;
+             ctx.drawImage(previousSceneBitmapRef.current, 0, 0, canvas.width, canvas.height);
+        }
+
+        // 2. Draw Current Scene (Fade In)
+        ctx.globalAlpha = transitionProgress; // Fade in current scene
+
         if (isVideoMode && videoRef.current) {
              // Draw video frame to canvas
-             if (!videoRef.current.paused && !videoRef.current.ended) {
-                ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
-             } else {
-                // If paused or loading, we might see black, so try drawing last frame
+             // We check readyState to avoid drawing black frames if video isn't ready
+             if (videoRef.current.readyState >= 2) {
                  ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
              }
         } else if (img.complete && img.src) {
@@ -464,9 +477,10 @@ const StoryPlayer: React.FC<StoryPlayerProps> = ({ media, storyData, onClose, cu
             const y = (canvas.height - h) / 2;
             ctx.drawImage(img, x, y, w, h);
         }
+        
+        ctx.globalAlpha = 1.0; // Reset alpha for overlays
 
-        // 2. VFX (Apply even on video for consistency if needed, or disable)
-        // Only apply heavy overlay VFX if it's image mode OR strictly requested
+        // --- LAYER 2: VFX ---
         if (visualEffect === 'storm') {
             if (Math.random() > 0.98) lightningOpacityRef.current = 0.8;
             if (lightningOpacityRef.current > 0) {
@@ -509,7 +523,7 @@ const StoryPlayer: React.FC<StoryPlayerProps> = ({ media, storyData, onClose, cu
         });
         ctx.globalAlpha = 1.0;
 
-        // 3. Overlay
+        // --- LAYER 3: Overlays ---
         const gradient = ctx.createLinearGradient(0, canvas.height * 0.4, 0, canvas.height);
         gradient.addColorStop(0, "rgba(0,0,0,0)");
         gradient.addColorStop(0.6, "rgba(0,0,0,0.4)");
@@ -517,7 +531,7 @@ const StoryPlayer: React.FC<StoryPlayerProps> = ({ media, storyData, onClose, cu
         ctx.fillStyle = gradient;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        // 4. Logo
+        // Logo
         if (logoImgRef.current && logoImgRef.current.complete) {
             const logoSize = 150; const margin = 50;
             const aspectRatio = logoImgRef.current.width / logoImgRef.current.height;
@@ -528,7 +542,7 @@ const StoryPlayer: React.FC<StoryPlayerProps> = ({ media, storyData, onClose, cu
             ctx.shadowColor = "transparent";
         }
 
-        // 5. Subtitles
+        // Subtitles
         if (showSubtitles) {
             let textToDraw = media[currentSceneIndex].text;
             if (subtitleLang === 'en' && media[currentSceneIndex].textEn) textToDraw = media[currentSceneIndex].textEn!;
@@ -605,11 +619,29 @@ const StoryPlayer: React.FC<StoryPlayerProps> = ({ media, storyData, onClose, cu
     animationFrameRef.current = requestAnimationFrame(trackProgress);
   };
 
-  const handleSceneComplete = () => {
+  const handleSceneComplete = async () => {
     cancelAnimationFrame(animationFrameRef.current);
     setProgress(100);
+    
+    // Capture snapshot of current frame for transition
+    if (canvasRef.current) {
+       try {
+           const bitmap = await createImageBitmap(canvasRef.current);
+           previousSceneBitmapRef.current = bitmap;
+           transitionStartTimeRef.current = performance.now();
+       } catch (e) {
+           console.log("Snapshot failed", e);
+       }
+    }
+
     if (currentSceneIndex < media.length - 1) {
-      setTimeout(() => { setCurrentSceneIndex(prev => prev + 1); pausedTimeRef.current = 0; setProgress(0); }, 500); 
+      // Small delay to allow snapshot and logic to settle
+      // We don't want a long delay, just enough for the loop to pick up the transition state
+      setTimeout(() => { 
+          setCurrentSceneIndex(prev => prev + 1); 
+          pausedTimeRef.current = 0; 
+          setProgress(0); 
+      }, 50); 
     } else {
       setIsPlaying(false); pausedTimeRef.current = 0;
       if (bgmSourceRef.current) bgmSourceRef.current.pause();
